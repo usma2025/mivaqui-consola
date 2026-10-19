@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 interface Finca {
   finca_id: string;
@@ -23,6 +25,16 @@ function diasDesde(fechaIso: string | null): number | null {
   return Math.floor(dias);
 }
 
+function KpiSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="h-24 rounded-2xl skeleton" style={{ animationDelay: `${i * 80}ms` }} />
+      ))}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [fincas, setFincas] = useState<Finca[] | null>(null);
   const [pilotos, setPilotos] = useState<Piloto[] | null>(null);
@@ -40,8 +52,39 @@ export default function DashboardPage() {
       .catch(() => setError("No se pudo cargar el resumen"));
   }, []);
 
-  if (error) return <p className="text-sm text-rose-600">{error}</p>;
-  if (!fincas || !pilotos) return <p className="text-sm text-[#6D7B77]">Cargando…</p>;
+  const header = (
+    <div className="flex items-start justify-between animate-fade-in-up">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1F2937", letterSpacing: "-0.025em" }}>
+          Resumen
+        </h1>
+        <p className="mt-1.5 text-[15px]" style={{ color: "#6D7B77" }}>
+          Estado general de todas las fincas del piloto.
+        </p>
+      </div>
+      <Link href="/fincas/nueva">
+        <Button size="sm">+ Nueva finca</Button>
+      </Link>
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <p className="text-sm font-medium text-rose-600">{error}</p>
+      </div>
+    );
+  }
+
+  if (!fincas || !pilotos) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <KpiSkeleton />
+      </div>
+    );
+  }
 
   const totalAnimales = fincas.reduce((acc, f) => acc + f.animales_activos, 0);
   const totalAlertas = fincas.reduce((acc, f) => acc + f.alertas_activas, 0);
@@ -58,35 +101,32 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[#0B4C4A]">Resumen</h1>
-        <Link
-          href="/fincas/nueva"
-          className="rounded-lg bg-[#0B4C4A] px-4 py-2 text-sm font-semibold text-white hover:bg-[#0d5a58]"
-        >
-          + Nueva finca
-        </Link>
-      </div>
+    <div className="space-y-6">
+      {header}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="stagger grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map((kpi) => (
-          <div key={kpi.label} className="rounded-xl border border-[#DDE5DD] bg-white p-4">
-            <p className="text-2xl font-bold text-[#0B4C4A]">{kpi.value}</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-wide text-[#9AA7A3]">{kpi.label}</p>
-          </div>
+          <Card key={kpi.label} className="animate-fade-in-up p-5">
+            <p className="text-3xl font-bold" style={{ color: "#0B4C4A" }}>{kpi.value}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9AA7A3" }}>
+              {kpi.label}
+            </p>
+          </Card>
         ))}
       </div>
 
       {fincasEnSilencio.length > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="text-sm font-semibold text-amber-800">
+        <Card
+          className="animate-fade-in-up p-5"
+          style={{ backgroundColor: "#fffbeb", borderColor: "#fde68a" }}
+        >
+          <p className="text-sm font-semibold" style={{ color: "#92400e" }}>
             {fincasEnSilencio.length} finca{fincasEnSilencio.length === 1 ? "" : "s"} sin actividad hace más de 7 días
           </p>
           <ul className="mt-2 flex flex-col gap-1">
             {fincasEnSilencio.map((f) => (
-              <li key={f.finca_id} className="text-sm text-amber-700">
-                <Link href={`/fincas`} className="underline">
+              <li key={f.finca_id} className="text-sm" style={{ color: "#92400e" }}>
+                <Link href="/fincas" className="underline">
                   {f.nombre_finca ?? f.finca_id}
                 </Link>
                 {" — "}
@@ -94,7 +134,7 @@ export default function DashboardPage() {
               </li>
             ))}
           </ul>
-        </div>
+        </Card>
       )}
     </div>
   );

@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins } from "next/font/google";
 import { Toaster } from "sonner";
 import { NavBar } from "@/components/NavBar";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const poppins = Poppins({
   subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-poppins",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -21,14 +18,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="flex min-h-full bg-[#F5F7F4]">
-        <NavBar />
-        <main className="flex-1 overflow-y-auto p-8">{children}</main>
-        <Toaster richColors position="top-right" />
+    <html lang="es" className={poppins.variable}>
+      <body style={{ backgroundColor: "#F5F7F4" }}>
+        <div className="flex min-h-screen">
+          <NavBar />
+          <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-12 pt-6 md:px-8">{children}</main>
+        </div>
+        <Toaster richColors position="top-right" toastOptions={{ duration: 4000 }} />
       </body>
     </html>
   );

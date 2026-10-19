@@ -3,6 +3,10 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function NuevaFincaForm() {
   const router = useRouter();
@@ -46,110 +50,93 @@ function NuevaFincaForm() {
 
   if (resultado) {
     return (
-      <div className="max-w-lg rounded-2xl border border-[#CFE6CB] bg-[#E7F3E3] p-6">
-        <h2 className="text-lg font-bold text-[#0B4C4A]">Finca {resultado.finca_id} creada</h2>
-        <p className="mt-2 text-sm text-[#1E4A1E]">
-          Contraseña temporal para {telefonoAdmin} (cópiela y compártasela — no se vuelve a mostrar):
-        </p>
-        <code className="mt-2 block rounded-lg bg-white px-3 py-2 font-mono text-sm text-[#0B4C4A]">
-          {resultado.password_temporal}
-        </code>
-        <div className="mt-4 flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(resultado.password_temporal);
-              toast.success("Contraseña copiada");
-            }}
-            className="rounded-lg border border-[#0B4C4A] px-3 py-1.5 text-sm font-medium text-[#0B4C4A]"
-          >
-            Copiar contraseña
-          </button>
-          <button
-            type="button"
-            onClick={() => router.push("/fincas")}
-            className="rounded-lg bg-[#0B4C4A] px-3 py-1.5 text-sm font-medium text-white"
-          >
-            Ver fincas
-          </button>
-        </div>
+      <div className="max-w-lg animate-scale-in">
+        <Card style={{ backgroundColor: "#E7F3E3", borderColor: "#CFE6CB" }}>
+          <CardHeader>
+            <CardTitle style={{ color: "#0B4C4A" }}>Finca {resultado.finca_id} creada</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm" style={{ color: "#1E4A1E" }}>
+              Contraseña temporal para {telefonoAdmin} (cópiela y compártasela — no se vuelve a mostrar):
+            </p>
+            <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
+              {resultado.password_temporal}
+            </code>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(resultado.password_temporal);
+                  toast.success("Contraseña copiada");
+                }}
+              >
+                Copiar contraseña
+              </Button>
+              <Button size="sm" onClick={() => router.push("/fincas")}>
+                Ver fincas
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold text-[#0B4C4A]">Nueva finca</h1>
-      <form onSubmit={handleSubmit} className="flex max-w-lg flex-col gap-4">
-        <Field label="Nombre de la finca">
-          <input
-            type="text"
-            value={nombreFinca}
-            onChange={(e) => setNombreFinca(e.target.value)}
-            required
-            className="rounded-lg border border-[#DDE5DD] px-3 py-2 text-sm outline-none focus:border-[#53B04B]"
-          />
-        </Field>
-        <Field label="Ubicación (opcional)">
-          <input
-            type="text"
-            value={ubicacion}
-            onChange={(e) => setUbicacion(e.target.value)}
-            className="rounded-lg border border-[#DDE5DD] px-3 py-2 text-sm outline-none focus:border-[#53B04B]"
-          />
-        </Field>
-        <Field label="Tamaño aproximado del hato (opcional)">
-          <input
-            type="number"
-            min="0"
-            value={tamanoHato}
-            onChange={(e) => setTamanoHato(e.target.value)}
-            className="rounded-lg border border-[#DDE5DD] px-3 py-2 text-sm outline-none focus:border-[#53B04B]"
-          />
-        </Field>
+    <div className="space-y-6">
+      <div className="animate-fade-in-up">
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1F2937", letterSpacing: "-0.025em" }}>
+          Nueva finca
+        </h1>
+        <p className="mt-1.5 text-[15px]" style={{ color: "#6D7B77" }}>
+          Crea la finca y su primer usuario administrador en un solo paso.
+        </p>
+      </div>
 
-        <div className="mt-2 rounded-xl border border-[#DDE5DD] bg-[#F5F7F4] p-4">
-          <p className="mb-3 text-[13px] font-semibold text-[#6D7B77]">Primer usuario (administrador de la finca)</p>
-          <div className="flex flex-col gap-3">
-            <Field label="Nombre">
-              <input
-                type="text"
-                value={nombreAdmin}
-                onChange={(e) => setNombreAdmin(e.target.value)}
-                required
-                className="rounded-lg border border-[#DDE5DD] bg-white px-3 py-2 text-sm outline-none focus:border-[#53B04B]"
-              />
-            </Field>
-            <Field label="WhatsApp (formato +573...)">
-              <input
-                type="text"
-                value={telefonoAdmin}
-                onChange={(e) => setTelefonoAdmin(e.target.value)}
-                placeholder="+573001234567"
-                required
-                className="rounded-lg border border-[#DDE5DD] bg-white px-3 py-2 text-sm outline-none focus:border-[#53B04B]"
-              />
-            </Field>
-          </div>
-        </div>
+      <Card className="max-w-lg animate-fade-in-up">
+        <CardContent className="pt-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="nombre_finca">Nombre de la finca</Label>
+              <Input id="nombre_finca" type="text" value={nombreFinca} onChange={(e) => setNombreFinca(e.target.value)} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ubicacion">Ubicación (opcional)</Label>
+              <Input id="ubicacion" type="text" value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tamano">Tamaño aproximado del hato (opcional)</Label>
+              <Input id="tamano" type="number" min="0" value={tamanoHato} onChange={(e) => setTamanoHato(e.target.value)} />
+            </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="mt-2 rounded-lg bg-[#0B4C4A] py-2.5 text-sm font-semibold text-white hover:bg-[#0d5a58] disabled:opacity-60"
-        >
-          {loading ? "Creando…" : "Crear finca"}
-        </button>
-      </form>
-    </div>
-  );
-}
+            <div className="space-y-3 rounded-xl p-4" style={{ backgroundColor: "#F5F7F4", border: "1px solid #DDE5DD" }}>
+              <p className="text-[13px] font-semibold" style={{ color: "#6D7B77" }}>
+                Primer usuario (administrador de la finca)
+              </p>
+              <div className="space-y-1.5">
+                <Label htmlFor="nombre_admin">Nombre</Label>
+                <Input id="nombre_admin" type="text" value={nombreAdmin} onChange={(e) => setNombreAdmin(e.target.value)} required />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="telefono_admin">WhatsApp (formato +573...)</Label>
+                <Input
+                  id="telefono_admin"
+                  type="text"
+                  placeholder="+573001234567"
+                  value={telefonoAdmin}
+                  onChange={(e) => setTelefonoAdmin(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[13px] font-medium text-[#6D7B77]">{label}</label>
-      {children}
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading ? "Creando…" : "Crear finca"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
