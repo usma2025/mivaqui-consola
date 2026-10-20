@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.1153.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1153.0",
     "@aws-sdk/client-dynamodb": "^3.1153.0",
     "@aws-sdk/credential-providers": "^3.1153.0",

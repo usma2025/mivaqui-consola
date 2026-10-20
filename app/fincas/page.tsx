@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -28,6 +29,7 @@ function TableSkeleton() {
 }
 
 export default function FincasPage() {
+  const router = useRouter();
   const [fincas, setFincas] = useState<Finca[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,9 +83,15 @@ export default function FincasPage() {
           </TableHeader>
           <TableBody>
             {fincas.map((f) => (
-              <TableRow key={f.finca_id}>
+              <TableRow
+                key={f.finca_id}
+                className="cursor-pointer"
+                onClick={() => router.push(`/fincas/${f.finca_id}`)}
+              >
                 <TableCell className="font-semibold" style={{ color: "#0B4C4A" }}>
-                  {f.nombre_finca ?? f.finca_id}
+                  <Link href={`/fincas/${f.finca_id}`} className="hover:underline">
+                    {f.nombre_finca ?? f.finca_id}
+                  </Link>
                   <div className="font-mono text-xs font-normal" style={{ color: "#9AA7A3" }}>{f.finca_id}</div>
                 </TableCell>
                 <TableCell style={{ color: "#6D7B77" }}>{f.ubicacion ?? "—"}</TableCell>

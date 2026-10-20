@@ -1,9 +1,9 @@
-import { randomBytes } from "crypto";
 import { NextResponse } from "next/server";
-import { GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { AdminCreateUserCommand, AdminSetUserPasswordCommand } from "@aws-sdk/client-cognito-identity-provider";
-import { ddb, cognito } from "@/lib/aws-clients";
-import { TABLES, COGNITO_USER_POOL_ID } from "@/lib/tables";
+import { GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { ddb } from "@/lib/aws-clients";
+import { TABLES } from "@/lib/tables";
+import { contarAnimalesActivos, contarAlertasActivas, ultimaActividad } from "@/lib/fincas-aggregates";
+import { crearUsuarioCognito } from "@/lib/cognito-helpers";
 
 interface FincaItem {
   finca_id: string;
@@ -12,58 +12,6 @@ interface FincaItem {
   tamano_hato_aprox?: number;
   estado_piloto?: string;
   creado_en?: string;
-}
-
-async function contarAnimalesActivos(finca_id: string): Promise<number> {
-  const resp = await ddb.send(
-    new QueryCommand({
-      TableName: TABLES.animales,
-      KeyConditionExpression: "finca_id = :f",
-      FilterExpression: "attribute_not_exists(estado) OR estado <> :inactivo",
-      ExpressionAttributeValues: { ":f": finca_id, ":inactivo": "INACTIVO" },
-      Select: "COUNT",
-    })
-  );
-  return resp.Count ?? 0;
-}
-
-async function contarAlertasActivas(finca_id: string): Promise<number> {
-  const resp = await ddb.send(
-    new QueryCommand({
-      TableName: TABLES.alertas,
-      KeyConditionExpression: "finca_id = :f",
-      ExpressionAttributeValues: { ":f": finca_id },
-      Select: "COUNT",
-    })
-  );
-  return resp.Count ?? 0;
-}
-
-async function ultimaActividad(finca_id: string): Promise<string | null> {
-  // Query, no Scan (finca_id es la partition key) -- pero el orden de la sort
-  // key (arete_id#timestamp) no es cronológico entre animales distintos, así
-  // que hay que traer fecha_creacion de todos los eventos de la finca y
-  // tomar el máximo acá. A esta escala (fincas piloto) es barato; si el
-  // volumen de eventos crece mucho, esto necesita un GSI por fecha.
-  let lastKey: Record<string, unknown> | undefined;
-  let maxFecha: string | null = null;
-  do {
-    const resp = await ddb.send(
-      new QueryCommand({
-        TableName: TABLES.eventos,
-        KeyConditionExpression: "finca_id = :f",
-        ExpressionAttributeValues: { ":f": finca_id },
-        ProjectionExpression: "fecha_creacion",
-        ExclusiveStartKey: lastKey,
-      })
-    );
-    for (const item of resp.Items ?? []) {
-      const fecha = item.fecha_creacion as string | undefined;
-      if (fecha && (!maxFecha || fecha > maxFecha)) maxFecha = fecha;
-    }
-    lastKey = resp.LastEvaluatedKey;
-  } while (lastKey);
-  return maxFecha;
 }
 
 export async function GET() {
@@ -83,13 +31,6 @@ export async function GET() {
 
   enriquecidas.sort((a, b) => a.finca_id.localeCompare(b.finca_id));
   return NextResponse.json({ fincas: enriquecidas });
-}
-
-function generarPasswordTemporal(): string {
-  // Mismo criterio que el Backend real (_generar_password_temporal): mayúscula,
-  // minúscula, número y símbolo garantizados, sin depender de qué política de
-  // contraseñas tenga configurada el User Pool.
-  return `Mv${randomBytes(10).toString("base64url")}9!`;
 }
 
 async function siguienteFincaId(): Promise<string> {
@@ -132,30 +73,13 @@ export async function POST(request: Request) {
 
   const finca_id = await siguienteFincaId();
   const now = new Date().toISOString();
-  const passwordTemporal = generarPasswordTemporal();
 
-  if (COGNITO_USER_POOL_ID) {
-    try {
-      await cognito.send(
-        new AdminCreateUserCommand({
-          UserPoolId: COGNITO_USER_POOL_ID,
-          Username: telefono_admin,
-          MessageAction: "SUPPRESS",
-          TemporaryPassword: passwordTemporal,
-        })
-      );
-      await cognito.send(
-        new AdminSetUserPasswordCommand({
-          UserPoolId: COGNITO_USER_POOL_ID,
-          Username: telefono_admin,
-          Password: passwordTemporal,
-          Permanent: false,
-        })
-      );
-    } catch (err) {
-      console.error("No se pudo crear el usuario en Cognito", err);
-      return NextResponse.json({ error: "No se pudo crear el usuario de acceso al Portal" }, { status: 502 });
-    }
+  let passwordTemporal: string;
+  try {
+    passwordTemporal = await crearUsuarioCognito(telefono_admin);
+  } catch (err) {
+    console.error("No se pudo crear el usuario en Cognito", err);
+    return NextResponse.json({ error: "No se pudo crear el usuario de acceso al Portal" }, { status: 502 });
   }
 
   await ddb.send(
@@ -168,6 +92,7 @@ export async function POST(request: Request) {
         ...(typeof tamano_hato_aprox === "number" ? { tamano_hato_aprox } : {}),
         estado_piloto: "ACTIVA",
         creado_en: now,
+        notas: [],
       },
     })
   );

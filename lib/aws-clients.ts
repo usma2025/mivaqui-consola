@@ -1,6 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { CognitoIdentityProviderClient } from "@aws-sdk/client-cognito-identity-provider";
+import { CloudWatchClient } from "@aws-sdk/client-cloudwatch";
 import { fromIni } from "@aws-sdk/credential-providers";
 
 // Este panel corre fuera del Terraform del producto (es una herramienta
@@ -21,3 +22,5 @@ export const ddb = DynamoDBDocumentClient.from(ddbClient, {
 });
 
 export const cognito = new CognitoIdentityProviderClient({ region, credentials });
+
+export const cloudwatch = new CloudWatchClient({ region, credentials });

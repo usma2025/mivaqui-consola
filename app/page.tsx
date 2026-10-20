@@ -19,6 +19,12 @@ interface Piloto {
   created_at?: string;
 }
 
+interface Alarma {
+  nombre?: string;
+  descripcion?: string;
+  estado?: string;
+}
+
 function diasDesde(fechaIso: string | null): number | null {
   if (!fechaIso) return null;
   const dias = (Date.now() - new Date(fechaIso).getTime()) / (1000 * 60 * 60 * 24);
@@ -38,6 +44,7 @@ function KpiSkeleton() {
 export default function DashboardPage() {
   const [fincas, setFincas] = useState<Finca[] | null>(null);
   const [pilotos, setPilotos] = useState<Piloto[] | null>(null);
+  const [salud, setSalud] = useState<{ alarmas: Alarma[]; en_alarma: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +57,14 @@ export default function DashboardPage() {
         setPilotos(pilotosData.pilotos ?? []);
       })
       .catch(() => setError("No se pudo cargar el resumen"));
+
+    // Aparte y sin bloquear el resto del dashboard -- si CloudWatch falla
+    // o el perfil de AWS no tiene el permiso todavía, el resto del panel
+    // sigue funcionando igual.
+    fetch("/api/system-health")
+      .then((r) => r.json())
+      .then((data) => setSalud(data))
+      .catch(() => setSalud(null));
   }, []);
 
   const header = (
@@ -134,6 +149,33 @@ export default function DashboardPage() {
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+
+      {salud && (
+        <Card className="animate-fade-in-up p-5">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: salud.en_alarma > 0 ? "#e11d48" : "#53B04B" }}
+            />
+            <p className="text-sm font-semibold" style={{ color: "#1F2937" }}>
+              {salud.en_alarma > 0
+                ? `${salud.en_alarma} alarma${salud.en_alarma === 1 ? "" : "s"} de infraestructura activa${salud.en_alarma === 1 ? "" : "s"}`
+                : "Toda la infraestructura operando con normalidad"}
+            </p>
+          </div>
+          {salud.en_alarma > 0 && (
+            <ul className="mt-3 flex flex-col gap-1">
+              {salud.alarmas
+                .filter((a) => a.estado === "ALARM")
+                .map((a) => (
+                  <li key={a.nombre} className="text-sm" style={{ color: "#6D7B77" }}>
+                    <span className="font-mono text-xs">{a.nombre}</span> — {a.descripcion}
+                  </li>
+                ))}
+            </ul>
+          )}
         </Card>
       )}
     </div>
