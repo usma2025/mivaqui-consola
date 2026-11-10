@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/lib/auth-context";
+import { descargarCSV } from "@/lib/csv";
 
 interface Finca {
   finca_id: string;
@@ -30,6 +32,7 @@ function TableSkeleton() {
 
 export default function FincasPage() {
   const router = useRouter();
+  const { esAdmin } = useAuth();
   const [fincas, setFincas] = useState<Finca[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,9 +54,35 @@ export default function FincasPage() {
             {fincas ? `${fincas.length} finca${fincas.length === 1 ? "" : "s"} en el piloto` : "Listado de todas las fincas"}
           </p>
         </div>
-        <Link href="/fincas/nueva">
-          <Button size="sm">+ Nueva finca</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {fincas && fincas.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                descargarCSV(
+                  `fincas-${new Date().toISOString().slice(0, 10)}.csv`,
+                  fincas.map((f) => ({
+                    finca_id: f.finca_id,
+                    nombre_finca: f.nombre_finca ?? "",
+                    ubicacion: f.ubicacion ?? "",
+                    estado_piloto: f.estado_piloto ?? "ACTIVA",
+                    animales_activos: f.animales_activos,
+                    alertas_activas: f.alertas_activas,
+                    ultima_actividad: f.ultima_actividad ?? "",
+                  }))
+                )
+              }
+            >
+              Exportar CSV
+            </Button>
+          )}
+          {esAdmin && (
+            <Link href="/fincas/nueva">
+              <Button size="sm">+ Nueva finca</Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-sm font-medium text-rose-600">{error}</p>}

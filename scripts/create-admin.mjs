@@ -1,8 +1,13 @@
-// Crea (o resetea la contraseña de) un usuario del panel administrativo.
-// No hay registro público a propósito -- es una herramienta interna.
+// Crea (o resetea la contraseña y/o el rol de) un usuario del panel
+// administrativo. No hay registro público a propósito -- es una
+// herramienta interna.
 //
 // Uso:
-//   AWS_PROFILE=mivaqui-prod node scripts/create-admin.mjs <username> <password>
+//   AWS_PROFILE=mivaqui-prod node scripts/create-admin.mjs <username> <password> [ADMIN|LECTURA]
+//
+// Rol por defecto: ADMIN. LECTURA puede ver todo el panel pero ninguna
+// mutación (crear/editar finca, agregar o desactivar usuarios, convertir
+// postulaciones) -- ver lib/session-server.ts:requireAdmin.
 import { randomBytes, scrypt as scryptCallback } from "crypto";
 import { promisify } from "util";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
@@ -11,11 +16,12 @@ import { fromIni } from "@aws-sdk/credential-providers";
 
 const scrypt = promisify(scryptCallback);
 
-const [, , username, password] = process.argv;
+const [, , username, password, rolArg] = process.argv;
 if (!username || !password) {
-  console.error("Uso: node scripts/create-admin.mjs <username> <password>");
+  console.error("Uso: node scripts/create-admin.mjs <username> <password> [ADMIN|LECTURA]");
   process.exit(1);
 }
+const rol = rolArg === "LECTURA" ? "LECTURA" : "ADMIN";
 
 const profile = process.env.AWS_PROFILE;
 const region = process.env.AWS_REGION || "us-east-1";
@@ -38,9 +44,10 @@ await ddb.send(
     Item: {
       username: username.trim().toLowerCase(),
       password_hash,
+      rol,
       creado_en: new Date().toISOString(),
     },
   })
 );
 
-console.log(`Usuario '${username}' guardado en ${tableName}.`);
+console.log(`Usuario '${username}' (rol ${rol}) guardado en ${tableName}.`);

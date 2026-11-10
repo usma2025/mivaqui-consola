@@ -48,7 +48,10 @@ repo ni en variables de entorno.
 ## Crear o resetear un usuario del panel
 
 No hay pantalla de registro ni de "olvidé mi contraseña" todavía — es una
-herramienta de un puñado de personas. Para crear/resetear un usuario:
+herramienta de un puñado de personas. Un usuario ya logueado puede cambiar
+su propia contraseña desde **Mi cuenta** (`/cuenta`) en el panel. Para
+crear un usuario nuevo, o resetear la contraseña de alguien que perdió el
+acceso:
 
 ```bash
 AWS_PROFILE=mivaqui-prod node scripts/create-admin.mjs <username> <password>
@@ -70,19 +73,32 @@ terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
+## Desplegar fuera de una máquina local
+
+`infra/main.tf` crea un usuario de IAM (`mivaqui-admin-panel`) con permisos
+acotados a exactamente lo que el código usa (GetItem/PutItem/UpdateItem/
+Query/Scan en las tablas reales del producto + la propia; las 3 acciones de
+Cognito de `cognito-helpers.ts`; `cloudwatch:DescribeAlarms`). Para
+desplegar en Vercel u otro hosting:
+
+```bash
+cd infra
+terraform output -raw admin_panel_access_key_id
+terraform output -raw admin_panel_secret_access_key
+```
+
+y configura esos dos valores como `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`
+en el entorno del hosting (no hace falta `AWS_PROFILE` ahí — `lib/aws-
+clients.ts` usa la cadena de credenciales por defecto del SDK, que revisa
+variables de entorno antes que el perfil de CLI).
+
 ## Pendiente (siguiente iteración)
 
-- **Desplegar fuera de una máquina local**: hoy depende del perfil de AWS
-  CLI de quien lo corre. Para Vercel u otro hosting hace falta un
-  usuario/rol de IAM con permisos acotados (lectura en las tablas de
-  lectura, escritura solo en Fincas/Allowlist, `cognito-idp:AdminCreateUser`
-  + `AdminSetUserPassword` sobre el User Pool puntual) en vez de las
-  credenciales amplias del CLI.
 - **Costo/consumo por finca** (llamadas a OpenAI, mensajes de WhatsApp) —
-  todavía no hay de dónde leer eso; requiere instrumentar el Agent o leer
-  CloudWatch Logs Insights.
-- **Pantalla de cambio de contraseña** dentro del panel, en vez de depender
-  del script de bootstrap para resetear.
+  ✅ implementado: ver sección "Costo de uso" en la ficha de cada finca
+  (`Agent/app/services/cost_tracking.py` instrumenta el Agent, este panel
+  solo lee la tabla `AgentCostos-prod`).
 - **Estado del piloto editable** (`estado_piloto` ya existe como atributo en
   Fincas, pero hoy solo se setea en `ACTIVA` al crear — falta poder
-  marcarlo INACTIVA/CHURN desde la UI).
+  marcarlo INACTIVA/CHURN desde la UI). — ✅ implementado en la ficha de
+  finca (`/fincas/[finca_id]`).

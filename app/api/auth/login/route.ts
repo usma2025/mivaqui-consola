@@ -8,6 +8,7 @@ interface AdminUsuario {
   username: string;
   password_hash: string;
   nombre?: string;
+  rol?: "ADMIN" | "LECTURA";
 }
 
 export async function POST(request: Request) {
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Usuario o contraseña incorrectos" }, { status: 401 });
   }
 
-  const token = await createSessionToken({ username: usuario.username });
-  const response = NextResponse.json({ username: usuario.username, nombre: usuario.nombre ?? null });
+  const rol = usuario.rol === "LECTURA" ? "LECTURA" : "ADMIN";
+  const token = await createSessionToken({ username: usuario.username, rol });
+  const response = NextResponse.json({ username: usuario.username, nombre: usuario.nombre ?? null, rol });
   response.cookies.set(SESSION_COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

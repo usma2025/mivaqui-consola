@@ -4,6 +4,8 @@ import { ddb } from "@/lib/aws-clients";
 import { TABLES } from "@/lib/tables";
 import { contarAnimalesActivos, contarAlertasActivas, ultimaActividad } from "@/lib/fincas-aggregates";
 import { crearUsuarioCognito } from "@/lib/cognito-helpers";
+import { requireAdmin } from "@/lib/session-server";
+import { registrarAccion } from "@/lib/audit";
 
 interface FincaItem {
   finca_id: string;
@@ -44,6 +46,9 @@ async function siguienteFincaId(): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  const session = await requireAdmin();
+  if (session instanceof NextResponse) return session;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -107,11 +112,19 @@ export async function POST(request: Request) {
         nombre: nombre_admin,
         activo: true,
         creado_en: now,
+        modo_respuesta: "TEXTO",
         gsi1pk: finca_id,
         gsi1sk: telefono_admin,
       },
     })
   );
+
+  await registrarAccion({
+    usuario: session.username,
+    finca_id,
+    accion: "crear_finca",
+    detalle: `Finca "${nombre_finca}" creada con admin ${telefono_admin}`,
+  });
 
   return NextResponse.json({ finca_id, telefono_admin, password_temporal: passwordTemporal }, { status: 201 });
 }

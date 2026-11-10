@@ -7,10 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/lib/auth-context";
 
 function NuevaFincaForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { esAdmin, cargando: cargandoAuth } = useAuth();
+  const pilotoId = searchParams.get("piloto_id");
   const [nombreFinca, setNombreFinca] = useState(searchParams.get("finca") ?? "");
   const [ubicacion, setUbicacion] = useState(searchParams.get("ubicacion") ?? "");
   const [tamanoHato, setTamanoHato] = useState("");
@@ -41,11 +44,33 @@ function NuevaFincaForm() {
       }
       setResultado(body);
       toast.success(`Finca ${body.finca_id} creada`);
+
+      // Si venimos de "Convertir a finca" en /pilotos, cierra el loop:
+      // marca esa postulación como convertida para que deje de contar como
+      // pendiente. Si esto falla, la finca ya quedó creada igual -- no es
+      // motivo para mostrarle un error al operador.
+      if (pilotoId) {
+        fetch(`/api/pilotos/${encodeURIComponent(pilotoId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ finca_id: body.finca_id }),
+        }).catch(() => {});
+      }
     } catch {
       toast.error("No se pudo conectar con el servidor");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (!cargandoAuth && !esAdmin) {
+    return (
+      <div className="max-w-lg animate-fade-in-up">
+        <p className="text-sm font-medium" style={{ color: "#6D7B77" }}>
+          Tu usuario es de solo lectura — no puedes crear fincas.
+        </p>
+      </div>
+    );
   }
 
   if (resultado) {

@@ -5,10 +5,14 @@ import { TABLES } from "@/lib/tables";
 import {
   contarAnimalesActivos,
   listarAlertas,
+  listarCostos,
   listarEventosRecientes,
+  listarEventosPorDia,
   listarPotreros,
   listarUsuarios,
 } from "@/lib/fincas-aggregates";
+import { requireAdmin } from "@/lib/session-server";
+import { registrarAccion, listarAuditoriaFinca } from "@/lib/audit";
 
 const ESTADOS_VALIDOS = new Set(["ACTIVA", "PAUSADA", "CHURN"]);
 
@@ -20,13 +24,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fin
     return NextResponse.json({ error: "Finca no encontrada" }, { status: 404 });
   }
 
-  const [animales_activos, alertas, eventos_recientes, potreros, usuarios] = await Promise.all([
-    contarAnimalesActivos(finca_id),
-    listarAlertas(finca_id),
-    listarEventosRecientes(finca_id, 20),
-    listarPotreros(finca_id),
-    listarUsuarios(finca_id),
-  ]);
+  const [animales_activos, alertas, eventos_recientes, potreros, usuarios, costos, eventos_por_dia, auditoria] =
+    await Promise.all([
+      contarAnimalesActivos(finca_id),
+      listarAlertas(finca_id),
+      listarEventosRecientes(finca_id, 20),
+      listarPotreros(finca_id),
+      listarUsuarios(finca_id),
+      listarCostos(finca_id, 30),
+      listarEventosPorDia(finca_id, 30),
+      listarAuditoriaFinca(finca_id, 50),
+    ]);
 
   return NextResponse.json({
     finca: fincaResp.Item,
@@ -35,10 +43,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fin
     eventos_recientes,
     potreros,
     usuarios,
+    costos,
+    eventos_por_dia,
+    auditoria,
   });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ finca_id: string }> }) {
+  const session = await requireAdmin();
+  if (session instanceof NextResponse) return session;
+
   const { finca_id } = await params;
   let body: unknown;
   try {
@@ -97,6 +111,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ fi
       ExpressionAttributeValues: exprValues,
     })
   );
+
+  if (estado_piloto !== undefined) {
+    await registrarAccion({
+      usuario: session.username,
+      finca_id,
+      accion: "cambiar_estado",
+      detalle: `estado_piloto -> ${estado_piloto}`,
+    });
+  }
+  if (typeof nota === "string" && nota.trim()) {
+    await registrarAccion({ usuario: session.username, finca_id, accion: "agregar_nota", detalle: nota.trim() });
+  }
 
   return NextResponse.json({ message: "Actualizado" });
 }

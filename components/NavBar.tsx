@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -9,11 +10,14 @@ const LINKS = [
   { href: "/fincas", label: "Fincas" },
   { href: "/alertas", label: "Alertas" },
   { href: "/pilotos", label: "Postulaciones" },
+  { href: "/intentos-acceso", label: "Intentos sin autorizar" },
+  { href: "/auditoria", label: "Auditoría" },
 ];
 
 export function NavBar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [busqueda, setBusqueda] = useState("");
 
   if (pathname === "/login") return null;
 
@@ -21,6 +25,12 @@ export function NavBar() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
+  }
+
+  function handleBuscar(e: React.FormEvent) {
+    e.preventDefault();
+    if (!busqueda.trim()) return;
+    router.push(`/buscar?q=${encodeURIComponent(busqueda.trim())}`);
   }
 
   return (
@@ -32,6 +42,17 @@ export function NavBar() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/Logo-multiformato-09.png" alt="MiVaqui" className="h-8 w-auto object-contain" />
       </div>
+
+      <form onSubmit={handleBuscar} className="px-3 pb-3">
+        <input
+          type="search"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar finca o arete…"
+          className="w-full rounded-lg px-3 py-2 text-[13px] text-white placeholder-white/50 outline-none"
+          style={{ backgroundColor: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
+        />
+      </form>
 
       <div className="px-5 pb-3">
         <p className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#53B04B" }}>
@@ -80,6 +101,12 @@ export function NavBar() {
           <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ backgroundColor: "#53B04B" }} />
           En línea
         </div>
+        <Link
+          href="/cuenta"
+          className="block w-full rounded-lg px-3.5 py-2 text-left text-[13px] font-medium text-white/65 transition-colors duration-150 hover:text-white"
+        >
+          Mi cuenta
+        </Link>
         <button
           type="button"
           onClick={handleLogout}

@@ -3,11 +3,16 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/aws-clients";
 import { TABLES } from "@/lib/tables";
 import { deshabilitarUsuarioCognito } from "@/lib/cognito-helpers";
+import { requireAdmin } from "@/lib/session-server";
+import { registrarAccion } from "@/lib/audit";
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ finca_id: string; telefono: string }> }
 ) {
+  const session = await requireAdmin();
+  if (session instanceof NextResponse) return session;
+
   const { finca_id, telefono: telefonoParam } = await params;
   const telefono = decodeURIComponent(telefonoParam);
 
@@ -30,6 +35,8 @@ export async function DELETE(
   } catch (err) {
     console.error("No se pudo deshabilitar el usuario en Cognito", err);
   }
+
+  await registrarAccion({ usuario: session.username, finca_id, accion: "desactivar_usuario", detalle: telefono });
 
   return NextResponse.json({ message: "Usuario desactivado" });
 }

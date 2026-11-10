@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendChart } from "@/components/TrendChart";
+import { useAuth } from "@/lib/auth-context";
 
 interface Finca {
   finca_id: string;
@@ -17,6 +19,7 @@ interface Finca {
 interface Piloto {
   id: string;
   created_at?: string;
+  convertido?: boolean;
 }
 
 interface Alarma {
@@ -42,9 +45,11 @@ function KpiSkeleton() {
 }
 
 export default function DashboardPage() {
+  const { esAdmin } = useAuth();
   const [fincas, setFincas] = useState<Finca[] | null>(null);
   const [pilotos, setPilotos] = useState<Piloto[] | null>(null);
   const [salud, setSalud] = useState<{ alarmas: Alarma[]; en_alarma: number } | null>(null);
+  const [trend, setTrend] = useState<{ fecha: string; cantidad: number }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,6 +70,11 @@ export default function DashboardPage() {
       .then((r) => r.json())
       .then((data) => setSalud(data))
       .catch(() => setSalud(null));
+
+    fetch("/api/eventos-trend")
+      .then((r) => r.json())
+      .then((data) => setTrend(data.dias ?? []))
+      .catch(() => setTrend(null));
   }, []);
 
   const header = (
@@ -77,9 +87,11 @@ export default function DashboardPage() {
           Estado general de todas las fincas del piloto.
         </p>
       </div>
-      <Link href="/fincas/nueva">
-        <Button size="sm">+ Nueva finca</Button>
-      </Link>
+      {esAdmin && (
+        <Link href="/fincas/nueva">
+          <Button size="sm">+ Nueva finca</Button>
+        </Link>
+      )}
     </div>
   );
 
@@ -112,7 +124,7 @@ export default function DashboardPage() {
     { label: "Fincas activas", value: fincas.length },
     { label: "Animales registrados", value: totalAnimales },
     { label: "Alertas activas", value: totalAlertas },
-    { label: "Postulaciones sin convertir", value: pilotos.length },
+    { label: "Postulaciones sin convertir", value: pilotos.filter((p) => !p.convertido).length },
   ];
 
   return (
@@ -176,6 +188,15 @@ export default function DashboardPage() {
                 ))}
             </ul>
           )}
+        </Card>
+      )}
+
+      {trend && (
+        <Card className="animate-fade-in-up">
+          <CardHeader><CardTitle className="text-base">Eventos registrados por día — todas las fincas (30 días)</CardTitle></CardHeader>
+          <CardContent>
+            <TrendChart data={trend} />
+          </CardContent>
         </Card>
       )}
     </div>

@@ -12,10 +12,13 @@ export const TABLES = {
   alertas: process.env.ALERTAS_TABLE_NAME || "GanaderiaAlertas-prod",
   allowlist: process.env.ALLOWLIST_TABLE_NAME || "GanaderiaAllowlist-prod",
   potreros: process.env.POTREROS_TABLE_NAME || "GanaderiaPotreros-prod",
+  intentosAcceso: process.env.INTENTOS_ACCESO_TABLE_NAME || "GanaderiaIntentosAcceso-prod",
+  costos: process.env.COSTOS_TABLE_NAME || "AgentCostos-prod",
   pilotosComercial: process.env.PILOTOS_TABLE_NAME || "mivaqui-comercial-pilotos",
   // Tabla propia de este panel (no existe en el producto) — usuarios con
   // acceso al panel administrativo.
   adminUsuarios: process.env.ADMIN_USUARIOS_TABLE_NAME || "mivaqui-admin-usuarios",
+  auditoria: process.env.ADMIN_AUDIT_TABLE_NAME || "mivaqui-admin-audit",
 } as const;
 
 export const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || "";

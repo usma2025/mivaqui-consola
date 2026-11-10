@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { descargarCSV } from "@/lib/csv";
 
 interface AlertaConFinca {
   alerta_sk: string;
@@ -36,13 +38,35 @@ export default function AlertasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="animate-fade-in-up">
-        <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1F2937", letterSpacing: "-0.025em" }}>
-          Alertas
-        </h1>
-        <p className="mt-1.5 text-[15px]" style={{ color: "#6D7B77" }}>
-          Todas las alertas activas, de todas las fincas, en un solo lugar.
-        </p>
+      <div className="flex items-start justify-between animate-fade-in-up">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1F2937", letterSpacing: "-0.025em" }}>
+            Alertas
+          </h1>
+          <p className="mt-1.5 text-[15px]" style={{ color: "#6D7B77" }}>
+            Todas las alertas activas, de todas las fincas, en un solo lugar.
+          </p>
+        </div>
+        {alertas && alertas.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              descargarCSV(
+                `alertas-${new Date().toISOString().slice(0, 10)}.csv`,
+                alertas.map((a) => ({
+                  finca: a.finca_nombre ?? "",
+                  tipo_alerta: a.tipo_alerta ?? "",
+                  arete_id: a.arete_id ?? "",
+                  descripcion: a.descripcion ?? "",
+                  fecha_alerta: a.fecha_alerta ?? "",
+                }))
+              )
+            }
+          >
+            Exportar CSV
+          </Button>
+        )}
       </div>
 
       {error && <p className="text-sm font-medium text-rose-600">{error}</p>}

@@ -4,8 +4,11 @@ import { ddb } from "@/lib/aws-clients";
 import { TABLES } from "@/lib/tables";
 import { listarUsuarios } from "@/lib/fincas-aggregates";
 import { crearUsuarioCognito } from "@/lib/cognito-helpers";
+import { requireAdmin } from "@/lib/session-server";
+import { registrarAccion } from "@/lib/audit";
 
 const ROLES_VALIDOS = new Set(["ADMIN", "LECTURA"]);
+const MODOS_RESPUESTA_VALIDOS = new Set(["TEXTO", "VOZ"]);
 
 export async function GET(_request: Request, { params }: { params: Promise<{ finca_id: string }> }) {
   const { finca_id } = await params;
@@ -14,6 +17,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fin
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ finca_id: string }> }) {
+  const session = await requireAdmin();
+  if (session instanceof NextResponse) return session;
+
   const { finca_id } = await params;
   let body: unknown;
   try {
@@ -22,7 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ fin
     return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
 
-  const { telefono, nombre, rol } = (body as Record<string, unknown>) ?? {};
+  const { telefono, nombre, rol, modo_respuesta } = (body as Record<string, unknown>) ?? {};
   if (!telefono || typeof telefono !== "string" || !telefono.startsWith("+")) {
     return NextResponse.json({ error: "telefono requerido en formato E.164 (+573...)" }, { status: 400 });
   }
@@ -30,6 +36,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ fin
     return NextResponse.json({ error: "nombre requerido" }, { status: 400 });
   }
   const rolFinal = typeof rol === "string" && ROLES_VALIDOS.has(rol) ? rol : "LECTURA";
+  const modoFinal = typeof modo_respuesta === "string" && MODOS_RESPUESTA_VALIDOS.has(modo_respuesta) ? modo_respuesta : "TEXTO";
 
   const fincaResp = await ddb.send(new GetCommand({ TableName: TABLES.fincas, Key: { finca_id } }));
   if (!fincaResp.Item) {
@@ -60,11 +67,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ fin
         nombre,
         activo: true,
         creado_en: now,
+        modo_respuesta: modoFinal,
         gsi1pk: finca_id,
         gsi1sk: telefono,
       },
     })
   );
+
+  await registrarAccion({
+    usuario: session.username,
+    finca_id,
+    accion: "agregar_usuario",
+    detalle: `${nombre} (${telefono}, rol ${rolFinal}, respuesta ${modoFinal})`,
+  });
 
   return NextResponse.json({ telefono, password_temporal: passwordTemporal }, { status: 201 });
 }

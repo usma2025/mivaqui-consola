@@ -10,6 +10,8 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TrendChart } from "@/components/TrendChart";
+import { useAuth } from "@/lib/auth-context";
 
 interface Finca {
   finca_id: string;
@@ -49,6 +51,33 @@ interface Usuario {
   nombre?: string;
   rol?: string;
   activo?: boolean;
+  modo_respuesta?: string;
+}
+
+interface CostoDiario {
+  fecha: string;
+  openai_llamadas?: number;
+  whatsapp_mensajes_enviados?: number;
+  whatsapp_mensajes_recibidos?: number;
+}
+
+interface ResumenCostos {
+  dias: CostoDiario[];
+  total_openai_llamadas: number;
+  total_whatsapp_mensajes: number;
+  total_whatsapp_recibidos: number;
+}
+
+interface PuntoTrend {
+  fecha: string;
+  cantidad: number;
+}
+
+interface AuditoriaItem {
+  timestamp: string;
+  usuario: string;
+  accion: string;
+  detalle?: string;
 }
 
 interface Detalle {
@@ -58,7 +87,19 @@ interface Detalle {
   eventos_recientes: Evento[];
   potreros: Potrero[];
   usuarios: Usuario[];
+  costos: ResumenCostos;
+  eventos_por_dia: PuntoTrend[];
+  auditoria: AuditoriaItem[];
 }
+
+const ACCIONES_LABEL: Record<string, string> = {
+  crear_finca: "Creó la finca",
+  cambiar_estado: "Cambió el estado",
+  agregar_nota: "Agregó una nota",
+  agregar_usuario: "Agregó un usuario",
+  desactivar_usuario: "Desactivó un usuario",
+  convertir_postulacion: "Convirtió una postulación",
+};
 
 const ESTADOS: { value: string; label: string }[] = [
   { value: "ACTIVA", label: "Activa" },
@@ -74,11 +115,12 @@ const ESTADO_BADGE: Record<string, "green" | "yellow" | "red"> = {
 
 export default function FichaFincaPage({ params }: { params: Promise<{ finca_id: string }> }) {
   const { finca_id } = use(params);
+  const { esAdmin } = useAuth();
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [nuevoEstado, setNuevoEstado] = useState("");
   const [nuevaNota, setNuevaNota] = useState("");
-  const [nuevoUsuario, setNuevoUsuario] = useState({ nombre: "", telefono: "", rol: "LECTURA" });
+  const [nuevoUsuario, setNuevoUsuario] = useState({ nombre: "", telefono: "", rol: "LECTURA", modo_respuesta: "TEXTO" });
   const [passwordMostrada, setPasswordMostrada] = useState<{ telefono: string; password: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -144,7 +186,7 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
         return;
       }
       setPasswordMostrada({ telefono: nuevoUsuario.telefono, password: body.password_temporal });
-      setNuevoUsuario({ nombre: "", telefono: "", rol: "LECTURA" });
+      setNuevoUsuario({ nombre: "", telefono: "", rol: "LECTURA", modo_respuesta: "TEXTO" });
       toast.success("Usuario agregado");
       await cargar();
     } catch {
@@ -183,7 +225,8 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
     return <p className="text-sm" style={{ color: "#6D7B77" }}>Cargando…</p>;
   }
 
-  const { finca, animales_activos, alertas, eventos_recientes, potreros, usuarios } = detalle;
+  const { finca, animales_activos, alertas, eventos_recientes, potreros, usuarios, costos, eventos_por_dia, auditoria } =
+    detalle;
 
   return (
     <div className="space-y-6">
@@ -230,23 +273,25 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
               <dt style={{ color: "#6D7B77" }}>Creada</dt>
               <dd style={{ color: "#1F2937" }}>{finca.creado_en ? new Date(finca.creado_en).toLocaleDateString("es-CO") : "—"}</dd>
             </dl>
-            <div className="flex items-end gap-2 border-t pt-4" style={{ borderColor: "#DDE5DD" }}>
-              <div className="flex-1 space-y-1.5">
-                <Label htmlFor="estado">Estado del piloto</Label>
-                <Select id="estado" value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value)}>
-                  {ESTADOS.map((e) => (
-                    <option key={e.value} value={e.value}>{e.label}</option>
-                  ))}
-                </Select>
+            {esAdmin && (
+              <div className="flex items-end gap-2 border-t pt-4" style={{ borderColor: "#DDE5DD" }}>
+                <div className="flex-1 space-y-1.5">
+                  <Label htmlFor="estado">Estado del piloto</Label>
+                  <Select id="estado" value={nuevoEstado} onChange={(e) => setNuevoEstado(e.target.value)}>
+                    {ESTADOS.map((e) => (
+                      <option key={e.value} value={e.value}>{e.label}</option>
+                    ))}
+                  </Select>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={guardando || nuevoEstado === finca.estado_piloto}
+                  onClick={() => actualizarFinca({ estado_piloto: nuevoEstado })}
+                >
+                  Guardar
+                </Button>
               </div>
-              <Button
-                size="sm"
-                disabled={guardando || nuevoEstado === finca.estado_piloto}
-                onClick={() => actualizarFinca({ estado_piloto: nuevoEstado })}
-              >
-                Guardar
-              </Button>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -284,6 +329,7 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
                   <TableHead>Nombre</TableHead>
                   <TableHead>WhatsApp</TableHead>
                   <TableHead>Rol</TableHead>
+                  <TableHead>Respuesta</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead />
                 </TableRow>
@@ -294,11 +340,12 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
                     <TableCell>{u.nombre ?? "—"}</TableCell>
                     <TableCell className="font-mono text-xs">{u.telefono}</TableCell>
                     <TableCell><Badge variant={u.rol === "ADMIN" ? "indigo" : "gray"}>{u.rol}</Badge></TableCell>
+                    <TableCell style={{ color: "#6D7B77" }}>{u.modo_respuesta === "VOZ" ? "🔊 Voz" : "Texto"}</TableCell>
                     <TableCell>
                       {u.activo ? <Badge variant="green">Activo</Badge> : <Badge variant="gray">Inactivo</Badge>}
                     </TableCell>
                     <TableCell>
-                      {u.activo && (
+                      {u.activo && esAdmin && (
                         <Button variant="destructive" size="sm" onClick={() => handleDesactivarUsuario(u.telefono)}>
                           Desactivar
                         </Button>
@@ -321,39 +368,52 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
             </div>
           )}
 
-          <form onSubmit={handleAgregarUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_120px_auto] sm:items-end">
-            <div className="space-y-1.5">
-              <Label htmlFor="u_nombre">Nombre</Label>
-              <Input
-                id="u_nombre"
-                value={nuevoUsuario.nombre}
-                onChange={(e) => setNuevoUsuario((u) => ({ ...u, nombre: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="u_telefono">WhatsApp</Label>
-              <Input
-                id="u_telefono"
-                placeholder="+573001234567"
-                value={nuevoUsuario.telefono}
-                onChange={(e) => setNuevoUsuario((u) => ({ ...u, telefono: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="u_rol">Rol</Label>
-              <Select
-                id="u_rol"
-                value={nuevoUsuario.rol}
-                onChange={(e) => setNuevoUsuario((u) => ({ ...u, rol: e.target.value }))}
-              >
-                <option value="LECTURA">Lectura</option>
-                <option value="ADMIN">Admin</option>
-              </Select>
-            </div>
-            <Button type="submit" size="sm" disabled={guardando}>Agregar</Button>
-          </form>
+          {esAdmin && (
+            <form onSubmit={handleAgregarUsuario} className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_120px_120px_auto] sm:items-end">
+              <div className="space-y-1.5">
+                <Label htmlFor="u_nombre">Nombre</Label>
+                <Input
+                  id="u_nombre"
+                  value={nuevoUsuario.nombre}
+                  onChange={(e) => setNuevoUsuario((u) => ({ ...u, nombre: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="u_telefono">WhatsApp</Label>
+                <Input
+                  id="u_telefono"
+                  placeholder="+573001234567"
+                  value={nuevoUsuario.telefono}
+                  onChange={(e) => setNuevoUsuario((u) => ({ ...u, telefono: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="u_rol">Rol</Label>
+                <Select
+                  id="u_rol"
+                  value={nuevoUsuario.rol}
+                  onChange={(e) => setNuevoUsuario((u) => ({ ...u, rol: e.target.value }))}
+                >
+                  <option value="LECTURA">Lectura</option>
+                  <option value="ADMIN">Admin</option>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="u_modo">Respuesta</Label>
+                <Select
+                  id="u_modo"
+                  value={nuevoUsuario.modo_respuesta}
+                  onChange={(e) => setNuevoUsuario((u) => ({ ...u, modo_respuesta: e.target.value }))}
+                >
+                  <option value="TEXTO">Texto</option>
+                  <option value="VOZ">Voz</option>
+                </Select>
+              </div>
+              <Button type="submit" size="sm" disabled={guardando}>Agregar</Button>
+            </form>
+          )}
         </CardContent>
       </Card>
 
@@ -381,22 +441,24 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
         <Card className="animate-fade-in-up">
           <CardHeader><CardTitle className="text-base">Notas de seguimiento</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <form
-              onSubmit={async (e) => {
-                e.preventDefault();
-                if (!nuevaNota.trim()) return;
-                const ok = await actualizarFinca({ nota: nuevaNota.trim() });
-                if (ok) setNuevaNota("");
-              }}
-              className="flex gap-2"
-            >
-              <Input
-                value={nuevaNota}
-                onChange={(e) => setNuevaNota(e.target.value)}
-                placeholder="Ej: llamar el 15 para seguimiento"
-              />
-              <Button type="submit" size="sm" disabled={guardando || !nuevaNota.trim()}>Agregar</Button>
-            </form>
+            {esAdmin && (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!nuevaNota.trim()) return;
+                  const ok = await actualizarFinca({ nota: nuevaNota.trim() });
+                  if (ok) setNuevaNota("");
+                }}
+                className="flex gap-2"
+              >
+                <Input
+                  value={nuevaNota}
+                  onChange={(e) => setNuevaNota(e.target.value)}
+                  placeholder="Ej: llamar el 15 para seguimiento"
+                />
+                <Button type="submit" size="sm" disabled={guardando || !nuevaNota.trim()}>Agregar</Button>
+              </form>
+            )}
             {(finca.notas ?? []).length === 0 ? (
               <p className="text-sm" style={{ color: "#9AA7A3" }}>Sin notas todavía.</p>
             ) : (
@@ -415,6 +477,59 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
         </Card>
       </div>
 
+      {/* Costo de uso (OpenAI + WhatsApp, últimos 30 días) */}
+      <Card className="animate-fade-in-up">
+        <CardHeader><CardTitle className="text-base">Costo de uso — últimos 30 días</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-xl p-4" style={{ backgroundColor: "#F3F6F3" }}>
+              <p className="text-2xl font-bold" style={{ color: "#0B4C4A" }}>{costos.total_whatsapp_recibidos}</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9AA7A3" }}>Mensajes recibidos (ganadero)</p>
+            </div>
+            <div className="rounded-xl p-4" style={{ backgroundColor: "#F3F6F3" }}>
+              <p className="text-2xl font-bold" style={{ color: "#0B4C4A" }}>{costos.total_whatsapp_mensajes}</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9AA7A3" }}>Mensajes enviados (agente)</p>
+            </div>
+            <div className="rounded-xl p-4" style={{ backgroundColor: "#F3F6F3" }}>
+              <p className="text-2xl font-bold" style={{ color: "#0B4C4A" }}>{costos.total_openai_llamadas}</p>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "#9AA7A3" }}>Llamadas a OpenAI</p>
+            </div>
+          </div>
+          {costos.dias.length === 0 ? (
+            <p className="text-sm" style={{ color: "#9AA7A3" }}>Sin datos de uso en este período.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Recibidos</TableHead>
+                  <TableHead>Enviados</TableHead>
+                  <TableHead>Llamadas a OpenAI</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...costos.dias].reverse().map((d) => (
+                  <TableRow key={d.fecha}>
+                    <TableCell>{new Date(d.fecha).toLocaleDateString("es-CO")}</TableCell>
+                    <TableCell className="tabular-nums">{d.whatsapp_mensajes_recibidos ?? 0}</TableCell>
+                    <TableCell className="tabular-nums">{d.whatsapp_mensajes_enviados ?? 0}</TableCell>
+                    <TableCell className="tabular-nums">{d.openai_llamadas ?? 0}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tendencia de actividad */}
+      <Card className="animate-fade-in-up">
+        <CardHeader><CardTitle className="text-base">Eventos registrados por día (30 días)</CardTitle></CardHeader>
+        <CardContent>
+          <TrendChart data={eventos_por_dia} />
+        </CardContent>
+      </Card>
+
       {/* Eventos recientes */}
       <Card className="animate-fade-in-up">
         <CardHeader><CardTitle className="text-base">Actividad reciente</CardTitle></CardHeader>
@@ -431,6 +546,32 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
                   </span>
                   <span className="font-mono text-xs" style={{ color: "#9AA7A3" }}>
                     {e.fecha_creacion ? new Date(e.fecha_creacion).toLocaleString("es-CO") : "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Auditoría: quién hizo qué en esta finca desde el panel */}
+      <Card className="animate-fade-in-up">
+        <CardHeader><CardTitle className="text-base">Actividad del panel (auditoría)</CardTitle></CardHeader>
+        <CardContent>
+          {auditoria.length === 0 ? (
+            <p className="text-sm" style={{ color: "#9AA7A3" }}>Sin acciones registradas todavía.</p>
+          ) : (
+            <ul className="space-y-2">
+              {auditoria.map((a) => (
+                <li key={a.timestamp} className="flex items-start justify-between gap-4 text-sm">
+                  <span style={{ color: "#1F2937" }}>
+                    <span className="font-semibold">{a.usuario}</span>
+                    {" — "}
+                    {ACCIONES_LABEL[a.accion] ?? a.accion}
+                    {a.detalle && <span style={{ color: "#6D7B77" }}> ({a.detalle})</span>}
+                  </span>
+                  <span className="shrink-0 font-mono text-xs" style={{ color: "#9AA7A3" }}>
+                    {new Date(a.timestamp.split("#")[0]).toLocaleString("es-CO")}
                   </span>
                 </li>
               ))}

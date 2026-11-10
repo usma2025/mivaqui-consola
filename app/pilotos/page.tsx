@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/lib/auth-context";
 
 interface Piloto {
   id: string;
@@ -14,6 +16,8 @@ interface Piloto {
   tipoGanaderia?: string;
   cantidadAnimales?: string;
   created_at?: string;
+  convertido?: boolean;
+  finca_id_creada?: string;
 }
 
 function TableSkeleton() {
@@ -28,6 +32,7 @@ function TableSkeleton() {
 }
 
 export default function PilotosPage() {
+  const { esAdmin } = useAuth();
   const [pilotos, setPilotos] = useState<Piloto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,19 +92,32 @@ export default function PilotosPage() {
                   {p.created_at ? new Date(p.created_at).toLocaleDateString("es-CO") : "—"}
                 </TableCell>
                 <TableCell>
-                  <Link
-                    href={{
-                      pathname: "/fincas/nueva",
-                      query: {
-                        finca: p.finca ?? "",
-                        ubicacion: p.ubicacion ?? "",
-                        nombre: p.nombre ?? "",
-                        whatsapp: p.whatsapp ? `+${p.whatsapp}` : "",
-                      },
-                    }}
-                  >
-                    <Button variant="outline" size="sm">Convertir a finca</Button>
-                  </Link>
+                  {p.convertido ? (
+                    <Badge variant="green">
+                      {p.finca_id_creada ? (
+                        <Link href={`/fincas/${p.finca_id_creada}`} className="hover:underline">
+                          → {p.finca_id_creada}
+                        </Link>
+                      ) : (
+                        "Convertida"
+                      )}
+                    </Badge>
+                  ) : esAdmin ? (
+                    <Link
+                      href={{
+                        pathname: "/fincas/nueva",
+                        query: {
+                          finca: p.finca ?? "",
+                          ubicacion: p.ubicacion ?? "",
+                          nombre: p.nombre ?? "",
+                          whatsapp: p.whatsapp ? `+${p.whatsapp}` : "",
+                          piloto_id: p.id,
+                        },
+                      }}
+                    >
+                      <Button variant="outline" size="sm">Convertir a finca</Button>
+                    </Link>
+                  ) : null}
                 </TableCell>
               </TableRow>
             ))}

@@ -38,8 +38,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
 // aplicación independiente, con su propia tabla de usuarios por username
 // (no por teléfono/Cognito, que es el esquema del producto). ───────────────
 
+export type AdminRol = "ADMIN" | "LECTURA";
+
 export interface SessionPayload {
   username: string;
+  rol: AdminRol;
 }
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -54,7 +57,11 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   try {
     const { payload } = await jwtVerify(token, getSessionSecret());
     if (typeof payload.username !== "string") return null;
-    return { username: payload.username };
+    // Sesiones firmadas antes de que existiera `rol` (si quedó alguna cookie
+    // viva de antes de este cambio) se tratan como ADMIN -- eran la única
+    // clase de usuario que existía en ese momento.
+    const rol = payload.rol === "LECTURA" ? "LECTURA" : "ADMIN";
+    return { username: payload.username, rol };
   } catch {
     return null;
   }
