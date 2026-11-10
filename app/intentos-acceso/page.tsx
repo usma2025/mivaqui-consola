@@ -42,7 +42,9 @@ function AutorizarForm({
   fincas: FincaOpcion[];
   onDone: () => void;
 }) {
+  const esTelefono = identificador.startsWith("+");
   const [fincaId, setFincaId] = useState(fincas[0]?.finca_id ?? "");
+  const [telefono, setTelefono] = useState(esTelefono ? identificador : "");
   const [nombre, setNombre] = useState("");
   const [rol, setRol] = useState("LECTURA");
   const [enviando, setEnviando] = useState(false);
@@ -52,12 +54,16 @@ function AutorizarForm({
       toast.error("Elige una finca");
       return;
     }
+    if (!telefono.trim().startsWith("+")) {
+      toast.error("El teléfono real es obligatorio, en formato +57...");
+      return;
+    }
     setEnviando(true);
     try {
       const res = await fetch(`/api/intentos-acceso/${encodeURIComponent(identificador)}/autorizar`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ finca_id: fincaId, nombre: nombre || undefined, rol }),
+        body: JSON.stringify({ finca_id: fincaId, telefono: telefono.trim(), nombre: nombre || undefined, rol }),
       });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error ?? `Error ${res.status}`);
@@ -72,6 +78,17 @@ function AutorizarForm({
 
   return (
     <div className="flex flex-wrap items-end gap-2">
+      <div className="space-y-1">
+        <Label htmlFor={`telefono-${identificador}`}>Teléfono real</Label>
+        <Input
+          id={`telefono-${identificador}`}
+          value={telefono}
+          onChange={(e) => setTelefono(e.target.value)}
+          placeholder="+573001112233"
+          disabled={esTelefono}
+          className="w-40"
+        />
+      </div>
       <div className="space-y-1">
         <Label htmlFor={`finca-${identificador}`}>Finca</Label>
         <Select id={`finca-${identificador}`} value={fincaId} onChange={(e) => setFincaId(e.target.value)}>
@@ -163,7 +180,14 @@ export default function IntentosAccesoPage() {
           <TableBody>
             {intentos.map((intento) => (
               <TableRow key={intento.identificador}>
-                <TableCell className="font-mono text-xs" style={{ color: "#6D7B77" }}>{intento.identificador}</TableCell>
+                <TableCell className="font-mono text-xs" style={{ color: "#6D7B77" }}>
+                  {intento.identificador}
+                  {!intento.identificador.startsWith("+") && (
+                    <div className="mt-0.5 font-sans text-[11px]" style={{ color: "#9AA7A3" }}>
+                      BSUID (username de WhatsApp) — pide el teléfono real para autorizar
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell className="max-w-xs truncate" style={{ color: "#6D7B77" }}>{intento.ultimo_mensaje ?? "—"}</TableCell>
                 <TableCell style={{ color: "#6D7B77" }}>{intento.veces ?? 1}</TableCell>
                 <TableCell style={{ color: "#6D7B77" }}>
