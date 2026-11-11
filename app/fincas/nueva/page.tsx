@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +21,11 @@ function NuevaFincaForm() {
   const [telefonoAdmin, setTelefonoAdmin] = useState(searchParams.get("whatsapp") ?? "");
   const [nombreAdmin, setNombreAdmin] = useState(searchParams.get("nombre") ?? "");
   const [loading, setLoading] = useState(false);
-  const [resultado, setResultado] = useState<{ finca_id: string; password_temporal: string } | null>(null);
+  const [resultado, setResultado] = useState<{
+    finca_id: string;
+    password_temporal: string;
+    codigo_registro: { codigo: string; url_whatsapp: string; expira_en: string } | null;
+  } | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -75,19 +80,19 @@ function NuevaFincaForm() {
 
   if (resultado) {
     return (
-      <div className="max-w-lg animate-scale-in">
+      <div className="max-w-2xl animate-scale-in">
         <Card style={{ backgroundColor: "#E7F3E3", borderColor: "#CFE6CB" }}>
           <CardHeader>
             <CardTitle style={{ color: "#0B4C4A" }}>Finca {resultado.finca_id} creada</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm" style={{ color: "#1E4A1E" }}>
-              Contraseña temporal para {telefonoAdmin} (cópiela y compártasela — no se vuelve a mostrar):
-            </p>
-            <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
-              {resultado.password_temporal}
-            </code>
-            <div className="flex gap-2">
+          <CardContent className="flex flex-col gap-6 sm:flex-row sm:items-start">
+            <div className="flex-1 space-y-3">
+              <p className="text-sm" style={{ color: "#1E4A1E" }}>
+                Contraseña temporal para {telefonoAdmin} (cópiela y compártasela — no se vuelve a mostrar):
+              </p>
+              <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
+                {resultado.password_temporal}
+              </code>
               <Button
                 variant="outline"
                 size="sm"
@@ -98,10 +103,50 @@ function NuevaFincaForm() {
               >
                 Copiar contraseña
               </Button>
-              <Button size="sm" onClick={() => router.push("/fincas")}>
-                Ver fincas
-              </Button>
             </div>
+
+            {resultado.codigo_registro ? (
+              <div
+                className="flex flex-1 flex-col items-center gap-2 sm:border-l sm:pl-6"
+                style={{ borderColor: "#CFE6CB" }}
+              >
+                <p className="self-start text-sm font-semibold" style={{ color: "#1E4A1E" }}>
+                  QR para que {nombreAdmin || "el admin"} autorice su WhatsApp
+                </p>
+                <div className="rounded-2xl bg-white p-3" style={{ border: "1px solid #CFE6CB" }}>
+                  <QRCodeSVG value={resultado.codigo_registro.url_whatsapp} size={150} />
+                </div>
+                <p className="text-center text-xs" style={{ color: "#1E4A1E" }}>
+                  Código{" "}
+                  <code className="rounded bg-white px-1.5 py-0.5 font-mono font-semibold">
+                    {resultado.codigo_registro.codigo}
+                  </code>
+                  {" "}— válido hasta {new Date(resultado.codigo_registro.expira_en).toLocaleString("es-CO")}
+                </p>
+              </div>
+            ) : (
+              <p className="flex-1 text-sm" style={{ color: "#1E4A1E" }}>
+                No se pudo generar el QR de autoregistro.
+              </p>
+            )}
+          </CardContent>
+          <CardContent className="flex gap-2 pt-0">
+            <Button
+              size="sm"
+              onClick={() => {
+                setResultado(null);
+                setNombreFinca("");
+                setUbicacion("");
+                setTamanoHato("");
+                setTelefonoAdmin("");
+                setNombreAdmin("");
+              }}
+            >
+              Crear otra finca
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => router.push("/fincas")}>
+              Ver fincas
+            </Button>
           </CardContent>
         </Card>
       </div>

@@ -12,7 +12,7 @@ frontend:
         # build pero no al handler en producción) -- escribirlas a
         # .env.production antes de "next build" las empaqueta directo en el
         # standalone server output, sin depender de esa inyección.
-        - env | grep -E '^(AWS_REGION|COGNITO_USER_POOL_ID|ADMIN_SESSION_SECRET)=' >> .env.production || true
+        - env | grep -E '^(AWS_REGION|COGNITO_USER_POOL_ID|ADMIN_SESSION_SECRET|TWILIO_WHATSAPP_NUMBER_DISPLAY)=' >> .env.production || true
         - npm run build
   artifacts:
     baseDirectory: .next

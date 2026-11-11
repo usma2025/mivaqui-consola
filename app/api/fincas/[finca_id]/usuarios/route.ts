@@ -4,6 +4,7 @@ import { ddb } from "@/lib/aws-clients";
 import { TABLES } from "@/lib/tables";
 import { listarUsuarios } from "@/lib/fincas-aggregates";
 import { crearUsuarioCognito } from "@/lib/cognito-helpers";
+import { crearCodigoRegistro } from "@/lib/codigos-registro";
 import { requireAdmin } from "@/lib/session-server";
 import { registrarAccion } from "@/lib/audit";
 
@@ -81,5 +82,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ fin
     detalle: `${nombre} (${telefono}, rol ${rolFinal}, respuesta ${modoFinal})`,
   });
 
-  return NextResponse.json({ telefono, password_temporal: passwordTemporal }, { status: 201 });
+  // El QR es una comodidad sobre el alta que ya ocurrió -- si falla, el
+  // usuario queda creado en el allowlist igual (puede generarse de nuevo
+  // desde la ficha de la finca).
+  let codigoRegistro: Awaited<ReturnType<typeof crearCodigoRegistro>> | null = null;
+  try {
+    codigoRegistro = await crearCodigoRegistro(telefono, finca_id, rolFinal);
+  } catch (err) {
+    console.error("No se pudo generar el código de registro", err);
+  }
+
+  return NextResponse.json(
+    { telefono, password_temporal: passwordTemporal, codigo_registro: codigoRegistro },
+    { status: 201 }
+  );
 }

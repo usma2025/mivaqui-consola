@@ -13,6 +13,7 @@ export const TABLES = {
   allowlist: process.env.ALLOWLIST_TABLE_NAME || "GanaderiaAllowlist-prod",
   potreros: process.env.POTREROS_TABLE_NAME || "GanaderiaPotreros-prod",
   intentosAcceso: process.env.INTENTOS_ACCESO_TABLE_NAME || "GanaderiaIntentosAcceso-prod",
+  codigosRegistro: process.env.CODIGOS_REGISTRO_TABLE_NAME || "GanaderiaCodigosRegistro-prod",
   costos: process.env.COSTOS_TABLE_NAME || "AgentCostos-prod",
   pilotosComercial: process.env.PILOTOS_TABLE_NAME || "mivaqui-comercial-pilotos",
   // Tabla propia de este panel (no existe en el producto) — usuarios con
@@ -22,3 +23,11 @@ export const TABLES = {
 } as const;
 
 export const COGNITO_USER_POOL_ID = process.env.COGNITO_USER_POOL_ID || "";
+
+// Número público de WhatsApp del bot (sin el prefijo "whatsapp:") -- mismo
+// valor que usa el Backend real para armar sus enlaces wa.me (ver
+// TWILIO_WHATSAPP_NUMBER_DISPLAY en Infra). Este panel genera sus propios
+// códigos de registro escribiendo directo a DynamoDB (ver
+// lib/codigos-registro.ts), así que necesita el mismo número para construir
+// el mismo tipo de enlace.
+export const WHATSAPP_NUMBER_DISPLAY = process.env.TWILIO_WHATSAPP_NUMBER_DISPLAY || "";

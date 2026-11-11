@@ -88,6 +88,7 @@ locals {
     "GanaderiaPotreros-prod",
     "AgentCostos-prod",
     "GanaderiaIntentosAcceso-prod",
+    "GanaderiaCodigosRegistro-prod",
   ]
 
   cognito_user_pool_arn = "arn:aws:cognito-idp:${var.aws_region}:${data.aws_caller_identity.current.account_id}:userpool/${var.cognito_user_pool_id}"
@@ -150,4 +151,36 @@ resource "aws_iam_user_policy" "admin_panel" {
 
 resource "aws_iam_access_key" "admin_panel" {
   user = aws_iam_user.admin_panel.name
+}
+
+# ── Rol de cómputo para Amplify Hosting (SSR) ──────────────────────────────
+# Preferido sobre las access keys estáticas de arriba para el despliegue real
+# en Amplify: Amplify asume este rol en tiempo de ejecución (credenciales
+# temporales, sin secretos de larga duración que guardar como env var) -- el
+# usuario IAM + access key siguen existiendo para desarrollo local
+# (AWS_PROFILE) y como fallback. Mismos permisos exactos, mismo policy
+# document. Amplify no deja asociar esto por Terraform (la app en sí no está
+# en este estado, se creó manualmente en la consola) -- el ARN de este rol se
+# asocia después con:
+#   aws amplify update-app --app-id <id> --compute-role-arn <arn de abajo>
+data "aws_iam_policy_document" "amplify_compute_trust" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["amplify.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "amplify_compute" {
+  name               = "mivaqui-consola-amplify-compute"
+  assume_role_policy = data.aws_iam_policy_document.amplify_compute_trust.json
+}
+
+resource "aws_iam_role_policy" "amplify_compute" {
+  name   = "mivaqui-consola-amplify-compute-policy"
+  role   = aws_iam_role.amplify_compute.id
+  policy = data.aws_iam_policy_document.admin_panel.json
 }

@@ -6,3 +6,7 @@ output "admin_panel_secret_access_key" {
   value     = aws_iam_access_key.admin_panel.secret
   sensitive = true
 }
+
+output "amplify_compute_role_arn" {
+  value = aws_iam_role.amplify_compute.arn
+}

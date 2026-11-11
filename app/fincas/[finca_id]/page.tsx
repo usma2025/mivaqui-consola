@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,7 +122,11 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
   const [nuevoEstado, setNuevoEstado] = useState("");
   const [nuevaNota, setNuevaNota] = useState("");
   const [nuevoUsuario, setNuevoUsuario] = useState({ nombre: "", telefono: "", rol: "LECTURA", modo_respuesta: "TEXTO" });
-  const [passwordMostrada, setPasswordMostrada] = useState<{ telefono: string; password: string } | null>(null);
+  const [usuarioCreado, setUsuarioCreado] = useState<{
+    telefono: string;
+    password: string;
+    codigo_registro: { codigo: string; url_whatsapp: string; expira_en: string } | null;
+  } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   async function cargar() {
@@ -185,7 +190,11 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
         toast.error(body?.error ?? `Error ${res.status}`);
         return;
       }
-      setPasswordMostrada({ telefono: nuevoUsuario.telefono, password: body.password_temporal });
+      setUsuarioCreado({
+        telefono: nuevoUsuario.telefono,
+        password: body.password_temporal,
+        codigo_registro: body.codigo_registro ?? null,
+      });
       setNuevoUsuario({ nombre: "", telefono: "", rol: "LECTURA", modo_respuesta: "TEXTO" });
       toast.success("Usuario agregado");
       await cargar();
@@ -357,14 +366,43 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
             </Table>
           )}
 
-          {passwordMostrada && (
-            <div className="rounded-xl p-4" style={{ backgroundColor: "#E7F3E3", border: "1px solid #CFE6CB" }}>
-              <p className="text-sm" style={{ color: "#1E4A1E" }}>
-                Contraseña temporal para {passwordMostrada.telefono} (no se vuelve a mostrar):
-              </p>
-              <code className="mt-2 block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
-                {passwordMostrada.password}
-              </code>
+          {usuarioCreado && (
+            <div
+              className="flex flex-col gap-6 rounded-xl p-4 sm:flex-row sm:items-start"
+              style={{ backgroundColor: "#E7F3E3", border: "1px solid #CFE6CB" }}
+            >
+              <div className="flex-1 space-y-2">
+                <p className="text-sm" style={{ color: "#1E4A1E" }}>
+                  Contraseña temporal para {usuarioCreado.telefono} (no se vuelve a mostrar):
+                </p>
+                <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
+                  {usuarioCreado.password}
+                </code>
+              </div>
+              {usuarioCreado.codigo_registro ? (
+                <div
+                  className="flex flex-1 flex-col items-center gap-2 sm:border-l sm:pl-6"
+                  style={{ borderColor: "#CFE6CB" }}
+                >
+                  <p className="self-start text-sm font-semibold" style={{ color: "#1E4A1E" }}>
+                    QR para autorizar su WhatsApp
+                  </p>
+                  <div className="rounded-2xl bg-white p-3" style={{ border: "1px solid #CFE6CB" }}>
+                    <QRCodeSVG value={usuarioCreado.codigo_registro.url_whatsapp} size={140} />
+                  </div>
+                  <p className="text-center text-xs" style={{ color: "#1E4A1E" }}>
+                    Código{" "}
+                    <code className="rounded bg-white px-1.5 py-0.5 font-mono font-semibold">
+                      {usuarioCreado.codigo_registro.codigo}
+                    </code>
+                    {" "}— válido hasta {new Date(usuarioCreado.codigo_registro.expira_en).toLocaleString("es-CO")}
+                  </p>
+                </div>
+              ) : (
+                <p className="flex-1 text-sm" style={{ color: "#1E4A1E" }}>
+                  No se pudo generar el QR de autoregistro.
+                </p>
+              )}
             </div>
           )}
 
