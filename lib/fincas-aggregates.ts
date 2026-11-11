@@ -202,6 +202,10 @@ export interface AllowlistItem {
   creado_en?: string;
   modo_respuesta?: string;
   ultimo_codigo_registro?: string;
+  // Escape hatch para filas de antes de que existiera este tracking (ej.
+  // pilotos ya probados a mano) -- se puede marcar directo en DynamoDB sin
+  // fabricar un código "usado".
+  whatsapp_confirmado_manual?: boolean;
   // True si ultimo_codigo_registro ya fue canjeado por WhatsApp (ver
   // lib/codigos-registro.ts) -- resuelto acá, no en el ítem de DynamoDB.
   whatsapp_confirmado?: boolean;
@@ -209,9 +213,12 @@ export interface AllowlistItem {
 
 // True si el código de registro referenciado ya fue canjeado. GetItem
 // directo por su PK (codigo) -- barato incluso por usuario, nada de Scan.
-async function whatsappConfirmado(codigo: string | undefined): Promise<boolean> {
-  if (!codigo) return false;
-  const resp = await ddb.send(new GetCommand({ TableName: TABLES.codigosRegistro, Key: { codigo } }));
+async function whatsappConfirmado(item: AllowlistItem): Promise<boolean> {
+  if (item.whatsapp_confirmado_manual) return true;
+  if (!item.ultimo_codigo_registro) return false;
+  const resp = await ddb.send(
+    new GetCommand({ TableName: TABLES.codigosRegistro, Key: { codigo: item.ultimo_codigo_registro } })
+  );
   return Boolean(resp.Item?.usado);
 }
 
@@ -228,7 +235,7 @@ export async function listarUsuarios(finca_id: string): Promise<AllowlistItem[]>
   return Promise.all(
     items.map(async (item) => ({
       ...item,
-      whatsapp_confirmado: await whatsappConfirmado(item.ultimo_codigo_registro),
+      whatsapp_confirmado: await whatsappConfirmado(item),
     }))
   );
 }
