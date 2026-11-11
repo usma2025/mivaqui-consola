@@ -53,6 +53,7 @@ interface Usuario {
   rol?: string;
   activo?: boolean;
   modo_respuesta?: string;
+  whatsapp_confirmado?: boolean;
 }
 
 interface CostoDiario {
@@ -124,10 +125,11 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
   const [nuevoUsuario, setNuevoUsuario] = useState({ nombre: "", telefono: "", rol: "LECTURA", modo_respuesta: "TEXTO" });
   const [usuarioCreado, setUsuarioCreado] = useState<{
     telefono: string;
-    password: string;
+    password?: string;
     codigo_registro: { codigo: string; url_whatsapp: string; expira_en: string } | null;
   } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [generandoQrPara, setGenerandoQrPara] = useState<string | null>(null);
 
   async function cargar() {
     try {
@@ -202,6 +204,25 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
       toast.error("No se pudo conectar con el servidor");
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function handleGenerarQr(usuario: Usuario) {
+    setGenerandoQrPara(usuario.telefono);
+    try {
+      const res = await fetch(`/api/fincas/${finca_id}/usuarios/${encodeURIComponent(usuario.telefono)}`, {
+        method: "POST",
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body?.error ?? `Error ${res.status}`);
+        return;
+      }
+      setUsuarioCreado({ telefono: usuario.telefono, codigo_registro: body.codigo_registro ?? null });
+    } catch {
+      toast.error("No se pudo conectar con el servidor");
+    } finally {
+      setGenerandoQrPara(null);
     }
   }
 
@@ -340,6 +361,7 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
                   <TableHead>Rol</TableHead>
                   <TableHead>Respuesta</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>WhatsApp</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -352,6 +374,22 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
                     <TableCell style={{ color: "#6D7B77" }}>{u.modo_respuesta === "VOZ" ? "🔊 Voz" : "Texto"}</TableCell>
                     <TableCell>
                       {u.activo ? <Badge variant="green">Activo</Badge> : <Badge variant="gray">Inactivo</Badge>}
+                    </TableCell>
+                    <TableCell>
+                      {u.whatsapp_confirmado ? (
+                        <Badge variant="green">✓ Confirmado</Badge>
+                      ) : esAdmin && u.activo ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={generandoQrPara === u.telefono}
+                          onClick={() => handleGenerarQr(u)}
+                        >
+                          {generandoQrPara === u.telefono ? "Generando…" : "Generar QR"}
+                        </Button>
+                      ) : (
+                        <Badge variant="gray">Pendiente</Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {u.activo && esAdmin && (
@@ -371,14 +409,16 @@ export default function FichaFincaPage({ params }: { params: Promise<{ finca_id:
               className="flex flex-col gap-6 rounded-xl p-4 sm:flex-row sm:items-start"
               style={{ backgroundColor: "#E7F3E3", border: "1px solid #CFE6CB" }}
             >
-              <div className="flex-1 space-y-2">
-                <p className="text-sm" style={{ color: "#1E4A1E" }}>
-                  Contraseña temporal para {usuarioCreado.telefono} (no se vuelve a mostrar):
-                </p>
-                <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
-                  {usuarioCreado.password}
-                </code>
-              </div>
+              {usuarioCreado.password && (
+                <div className="flex-1 space-y-2">
+                  <p className="text-sm" style={{ color: "#1E4A1E" }}>
+                    Contraseña temporal para {usuarioCreado.telefono} (no se vuelve a mostrar):
+                  </p>
+                  <code className="block rounded-lg bg-white px-3 py-2 font-mono text-sm" style={{ color: "#0B4C4A" }}>
+                    {usuarioCreado.password}
+                  </code>
+                </div>
+              )}
               {usuarioCreado.codigo_registro ? (
                 <div
                   className="flex flex-1 flex-col items-center gap-2 sm:border-l sm:pl-6"

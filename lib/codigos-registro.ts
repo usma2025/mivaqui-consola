@@ -1,5 +1,6 @@
 import { randomInt } from "crypto";
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
+import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/aws-clients";
 import { TABLES, WHATSAPP_NUMBER_DISPLAY } from "@/lib/tables";
 
@@ -54,6 +55,25 @@ export async function crearCodigoRegistro(
       },
     })
   );
+
+  // Deja a este código como "el vigente" para que listarUsuarios() sepa de
+  // cuál fijarse para decidir si este teléfono ya confirmó su WhatsApp (ver
+  // whatsapp_confirmado en fincas-aggregates.ts). Si el teléfono todavía no
+  // existe en el allowlist (código generado antes del alta) no hay nada que
+  // actualizar todavía -- se ignora, no es un error.
+  try {
+    await ddb.send(
+      new UpdateCommand({
+        TableName: TABLES.allowlist,
+        Key: { telefono },
+        UpdateExpression: "SET ultimo_codigo_registro = :c",
+        ConditionExpression: "attribute_exists(telefono)",
+        ExpressionAttributeValues: { ":c": codigo },
+      })
+    );
+  } catch (err) {
+    if (!(err instanceof ConditionalCheckFailedException)) throw err;
+  }
 
   const url_whatsapp = WHATSAPP_NUMBER_DISPLAY ? `https://wa.me/${WHATSAPP_NUMBER_DISPLAY}?text=${codigo}` : "";
   return { codigo, url_whatsapp, expira_en: expiraEn.toISOString() };

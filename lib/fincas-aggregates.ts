@@ -1,4 +1,4 @@
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/aws-clients";
 import { TABLES } from "@/lib/tables";
 
@@ -201,6 +201,18 @@ export interface AllowlistItem {
   activo?: boolean;
   creado_en?: string;
   modo_respuesta?: string;
+  ultimo_codigo_registro?: string;
+  // True si ultimo_codigo_registro ya fue canjeado por WhatsApp (ver
+  // lib/codigos-registro.ts) -- resuelto acá, no en el ítem de DynamoDB.
+  whatsapp_confirmado?: boolean;
+}
+
+// True si el código de registro referenciado ya fue canjeado. GetItem
+// directo por su PK (codigo) -- barato incluso por usuario, nada de Scan.
+async function whatsappConfirmado(codigo: string | undefined): Promise<boolean> {
+  if (!codigo) return false;
+  const resp = await ddb.send(new GetCommand({ TableName: TABLES.codigosRegistro, Key: { codigo } }));
+  return Boolean(resp.Item?.usado);
 }
 
 export async function listarUsuarios(finca_id: string): Promise<AllowlistItem[]> {
@@ -212,5 +224,11 @@ export async function listarUsuarios(finca_id: string): Promise<AllowlistItem[]>
       ExpressionAttributeValues: { ":f": finca_id },
     })
   );
-  return (resp.Items ?? []) as AllowlistItem[];
+  const items = (resp.Items ?? []) as AllowlistItem[];
+  return Promise.all(
+    items.map(async (item) => ({
+      ...item,
+      whatsapp_confirmado: await whatsappConfirmado(item.ultimo_codigo_registro),
+    }))
+  );
 }
