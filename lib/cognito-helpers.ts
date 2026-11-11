@@ -16,7 +16,17 @@ export function generarPasswordTemporal(): string {
 
 export async function crearUsuarioCognito(telefono: string): Promise<string> {
   const passwordTemporal = generarPasswordTemporal();
-  if (!COGNITO_USER_POOL_ID) return passwordTemporal;
+  if (!COGNITO_USER_POOL_ID) {
+    // Sin pool configurado, en producción esto NO debe parecer un éxito:
+    // devolver una contraseña sin crear el usuario real deja a esa persona
+    // sin forma de entrar al Portal, sin que nadie se entere. En desarrollo
+    // local (sin credenciales de Cognito a mano) sigue permitiéndose, para
+    // poder probar el resto del flujo sin esa dependencia.
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("COGNITO_USER_POOL_ID no está configurado");
+    }
+    return passwordTemporal;
+  }
 
   await cognito.send(
     new AdminCreateUserCommand({

@@ -88,16 +88,22 @@ export async function POST(
     );
   }
 
-  if (identificador !== telefono) {
-    await ddb.send(
-      new UpdateCommand({
-        TableName: TABLES.allowlist,
-        Key: { telefono },
-        UpdateExpression: "SET bsuid = :b",
-        ExpressionAttributeValues: { ":b": identificador },
-      })
-    );
-  }
+  // Quien llegó hasta acá ya le escribió al bot por WhatsApp (por eso existe
+  // un intento de acceso) -- whatsapp_confirmado_manual es el mismo escape
+  // hatch que usa el Backend/Consola para pilotos probados a mano, así que
+  // "Generar QR" deja de ofrecerse para este número de una vez.
+  await ddb.send(
+    new UpdateCommand({
+      TableName: TABLES.allowlist,
+      Key: { telefono },
+      UpdateExpression:
+        "SET whatsapp_confirmado_manual = :t" + (identificador !== telefono ? ", bsuid = :b" : ""),
+      ExpressionAttributeValues: {
+        ":t": true,
+        ...(identificador !== telefono ? { ":b": identificador } : {}),
+      },
+    })
+  );
 
   await ddb.send(new DeleteCommand({ TableName: TABLES.intentosAcceso, Key: { identificador } }));
 

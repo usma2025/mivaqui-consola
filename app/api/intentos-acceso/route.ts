@@ -18,8 +18,17 @@ interface IntentoAccesoItem {
 // que solo debe poder verla/resolverla un operador de este panel, nunca un
 // admin de una finca individual desde `hato`.
 export async function GET() {
-  const scan = await ddb.send(new ScanCommand({ TableName: TABLES.intentosAcceso }));
-  const intentos = (scan.Items ?? []) as IntentoAccesoItem[];
+  // Un Scan de una sola página trunca en silencio pasado 1MB -- con
+  // suficientes intentos pendientes acumulados, esto dejaba algunos sin
+  // mostrar y sin ningún aviso. Pagina hasta agotar la tabla.
+  let lastKey: Record<string, unknown> | undefined;
+  const intentos: IntentoAccesoItem[] = [];
+  do {
+    const resp = await ddb.send(new ScanCommand({ TableName: TABLES.intentosAcceso, ExclusiveStartKey: lastKey }));
+    intentos.push(...((resp.Items ?? []) as IntentoAccesoItem[]));
+    lastKey = resp.LastEvaluatedKey;
+  } while (lastKey);
+
   intentos.sort((a, b) => (b.ultima_vez ?? "").localeCompare(a.ultima_vez ?? ""));
   return NextResponse.json({ intentos });
 }

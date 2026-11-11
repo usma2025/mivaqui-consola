@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ConditionalCheckFailedException } from "@aws-sdk/client-dynamodb";
 import { GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb } from "@/lib/aws-clients";
 import { TABLES } from "@/lib/tables";
@@ -46,6 +47,31 @@ async function siguienteFincaId(): Promise<string> {
   return `FINCA_${String(max + 1).padStart(3, "0")}`;
 }
 
+// Dos personas creando fincas a la vez (ej. una jornada de registro masivo)
+// pueden leer el mismo "siguiente" finca_id antes de que cualquiera lo haya
+// guardado -- sin esto, la segunda sobrescribiría a la primera en silencio.
+// ConditionExpression hace que la segunda falle en vez de pisar, y el
+// reintento recalcula un id nuevo en vez de devolver error al operador.
+async function crearFincaConIdUnico(item: Record<string, unknown>, maxIntentos = 5): Promise<string> {
+  for (let intento = 0; intento < maxIntentos; intento++) {
+    const finca_id = await siguienteFincaId();
+    try {
+      await ddb.send(
+        new PutCommand({
+          TableName: TABLES.fincas,
+          Item: { finca_id, ...item },
+          ConditionExpression: "attribute_not_exists(finca_id)",
+        })
+      );
+      return finca_id;
+    } catch (err) {
+      if (!(err instanceof ConditionalCheckFailedException)) throw err;
+      // otro proceso tomó este id justo ahora -- recalcula y reintenta
+    }
+  }
+  throw new Error("No se pudo generar un finca_id único tras varios intentos");
+}
+
 export async function POST(request: Request) {
   const session = await requireAdmin();
   if (session instanceof NextResponse) return session;
@@ -77,7 +103,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ese número ya está asignado a otra finca" }, { status: 409 });
   }
 
-  const finca_id = await siguienteFincaId();
   const now = new Date().toISOString();
 
   let passwordTemporal: string;
@@ -88,20 +113,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No se pudo crear el usuario de acceso al Portal" }, { status: 502 });
   }
 
-  await ddb.send(
-    new PutCommand({
-      TableName: TABLES.fincas,
-      Item: {
-        finca_id,
-        nombre_finca,
-        ...(ubicacion ? { ubicacion } : {}),
-        ...(typeof tamano_hato_aprox === "number" ? { tamano_hato_aprox } : {}),
-        estado_piloto: "ACTIVA",
-        creado_en: now,
-        notas: [],
-      },
-    })
-  );
+  const finca_id = await crearFincaConIdUnico({
+    nombre_finca,
+    ...(ubicacion ? { ubicacion } : {}),
+    ...(typeof tamano_hato_aprox === "number" ? { tamano_hato_aprox } : {}),
+    estado_piloto: "ACTIVA",
+    creado_en: now,
+    notas: [],
+  });
 
   await ddb.send(
     new PutCommand({

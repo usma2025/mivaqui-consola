@@ -14,12 +14,14 @@ const LINKS = [
   { href: "/auditoria", label: "Auditoría" },
 ];
 
-export function NavBar() {
+// Contenido compartido entre el sidebar de escritorio y el drawer móvil --
+// mismo estado de búsqueda/logout, solo cambia el contenedor que lo envuelve.
+// `onNavigate` lo pasa el drawer para cerrarse al tocar un enlace o buscar;
+// el sidebar de escritorio no lo necesita.
+function NavBarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
-
-  if (pathname === "/login") return null;
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -31,13 +33,11 @@ export function NavBar() {
     e.preventDefault();
     if (!busqueda.trim()) return;
     router.push(`/buscar?q=${encodeURIComponent(busqueda.trim())}`);
+    onNavigate?.();
   }
 
   return (
-    <aside
-      className="no-print sticky top-0 flex h-screen w-60 shrink-0 flex-col"
-      style={{ backgroundColor: "#0B4C4A" }}
-    >
+    <>
       <div className="flex h-16 shrink-0 items-center px-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/Logo-multiformato-09.png" alt="MiVaqui" className="h-8 w-auto object-contain" />
@@ -69,6 +69,7 @@ export function NavBar() {
             <Link
               key={link.href}
               href={link.href}
+              onClick={onNavigate}
               className={cn(
                 "relative block rounded-lg px-3.5 py-2.5 text-[14px] font-medium transition-colors duration-150",
                 active ? "text-white" : "text-white/65 hover:text-white"
@@ -103,6 +104,7 @@ export function NavBar() {
         </div>
         <Link
           href="/cuenta"
+          onClick={onNavigate}
           className="block w-full rounded-lg px-3.5 py-2 text-left text-[13px] font-medium text-white/65 transition-colors duration-150 hover:text-white"
         >
           Mi cuenta
@@ -115,6 +117,80 @@ export function NavBar() {
           Cerrar sesión
         </button>
       </div>
-    </aside>
+    </>
+  );
+}
+
+function HamburgerIcon() {
+  return (
+    <svg
+      width="22" height="22" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+    >
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+    </svg>
+  );
+}
+
+export function NavBar() {
+  const pathname = usePathname();
+  const [drawerAbierto, setDrawerAbierto] = useState(false);
+
+  // Red de seguridad: si la navegación cambia por cualquier otra vía (botón
+  // atrás/adelante, cerrar sesión, etc.) el drawer no debe quedar abierto.
+  // Ajustado durante el render (no en un Effect) -- patrón recomendado por
+  // React para "resetear estado cuando cambia una prop".
+  const [pathnamePrevio, setPathnamePrevio] = useState(pathname);
+  if (pathname !== pathnamePrevio) {
+    setPathnamePrevio(pathname);
+    setDrawerAbierto(false);
+  }
+
+  if (pathname === "/login") return null;
+
+  return (
+    <>
+      {/* Barra superior móvil -- reemplaza el sidebar por debajo de `lg` */}
+      <header
+        className="no-print sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between px-4 lg:hidden"
+        style={{ backgroundColor: "#0B4C4A" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/Logo-multiformato-09.png" alt="MiVaqui" className="h-7 w-auto object-contain" />
+        <button
+          type="button"
+          aria-label="Abrir menú de navegación"
+          onClick={() => setDrawerAbierto(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-white/80 transition-colors duration-150 hover:text-white hover:bg-white/10"
+        >
+          <HamburgerIcon />
+        </button>
+      </header>
+
+      {drawerAbierto && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/40 animate-fade-in"
+            onClick={() => setDrawerAbierto(false)}
+          />
+          <aside
+            className="absolute inset-y-0 left-0 flex h-full w-72 max-w-[80vw] flex-col overflow-y-auto shadow-xl animate-slide-in-left"
+            style={{ backgroundColor: "#0B4C4A" }}
+          >
+            <NavBarContent onNavigate={() => setDrawerAbierto(false)} />
+          </aside>
+        </div>
+      )}
+
+      {/* Sidebar fijo -- sin cambios de comportamiento en `lg` y superior */}
+      <aside
+        className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col lg:flex"
+        style={{ backgroundColor: "#0B4C4A" }}
+      >
+        <NavBarContent />
+      </aside>
+    </>
   );
 }

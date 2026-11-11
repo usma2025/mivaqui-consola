@@ -22,7 +22,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="es" className={poppins.variable}>
       <body style={{ backgroundColor: "#F5F7F4" }}>
         <AuthProvider>
-          <div className="flex min-h-screen">
+          <div className="flex min-h-screen flex-col lg:flex-row">
             <NavBar />
             <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-12 pt-6 md:px-8">{children}</main>
           </div>

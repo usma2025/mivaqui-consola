@@ -25,14 +25,25 @@ export interface AlertaItem {
 }
 
 export async function listarAlertas(finca_id: string): Promise<AlertaItem[]> {
-  const resp = await ddb.send(
-    new QueryCommand({
-      TableName: TABLES.alertas,
-      KeyConditionExpression: "finca_id = :f",
-      ExpressionAttributeValues: { ":f": finca_id },
-    })
-  );
-  return (resp.Items ?? []) as AlertaItem[];
+  // Un Query sin seguir LastEvaluatedKey trunca en silencio pasado 1MB de
+  // página -- con suficientes alertas acumuladas en una finca, esto dejaba
+  // de mostrar las más antiguas sin ningún aviso. Mismo patrón de paginar-
+  // hasta-agotar que ya usan listarEventosRecientes/listarEventosPorDia.
+  let lastKey: Record<string, unknown> | undefined;
+  const todas: AlertaItem[] = [];
+  do {
+    const resp = await ddb.send(
+      new QueryCommand({
+        TableName: TABLES.alertas,
+        KeyConditionExpression: "finca_id = :f",
+        ExpressionAttributeValues: { ":f": finca_id },
+        ExclusiveStartKey: lastKey,
+      })
+    );
+    todas.push(...((resp.Items ?? []) as AlertaItem[]));
+    lastKey = resp.LastEvaluatedKey;
+  } while (lastKey);
+  return todas;
 }
 
 export async function contarAlertasActivas(finca_id: string): Promise<number> {
