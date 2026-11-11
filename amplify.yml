@@ -1,0 +1,24 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci --cache .npm --prefer-offline
+    build:
+      commands:
+        # Amplify Hosting no garantiza que las env vars configuradas en la
+        # consola/branch lleguen al runtime de cómputo SSR de Next.js
+        # (confirmado: ADMIN_SESSION_SECRET/COGNITO_USER_POOL_ID llegaban al
+        # build pero no al handler en producción) -- escribirlas a
+        # .env.production antes de "next build" las empaqueta directo en el
+        # standalone server output, sin depender de esa inyección.
+        - env | grep -E '^(AWS_REGION|COGNITO_USER_POOL_ID|ADMIN_SESSION_SECRET)=' >> .env.production || true
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - .next/cache/**/*
+      - .npm/**/*
